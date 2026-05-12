@@ -41,18 +41,18 @@ def run_quant_engine():
         st.error(f"映射表加载失败: {e}")
         return
 
-        # [2/4] 拉取全市场快照
-        status_text.text("📡 [2/4] 正在穿透云端网络，硬连接通达信主节点...")
+    # [2/4] 拉取全市场快照
+    status_text.text("📡 [2/4] 正在穿透云端网络，硬连接通达信主节点...")
 
-        # 🛡️ 终极防线：准备多个高可用国内节点，跳过云端无法执行的 ping 测速
-        tdx_servers = [
+    # 🛡️ 终极防线：准备多个高可用国内节点，跳过云端无法执行的 ping 测速
+    tdx_servers = [
             ('119.147.212.81', 7709),  # 深圳电信
             ('114.80.63.12', 7709),  # 上海电信
             ('121.14.110.200', 7709),  # 广东电信
             ('110.139.17.151', 7709)  # 湖北电信
         ]
 
-        client = None
+     client = None
         for server in tdx_servers:
             try:
                 # 强制传入 server 参数，让 mootdx 闭嘴，直接连！
@@ -66,7 +66,7 @@ def run_quant_engine():
             progress_bar.empty()
             return
 
-        symbol_list = df_map['代码'].tolist()
+    symbol_list = df_map['代码'].tolist()
     all_quotes = []
 
     # 云端建议分块稍大以提高速度
