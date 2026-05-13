@@ -1,42 +1,56 @@
-import pandas as pd
-from mootdx.quotes import Quotes
-import time
 import os
+import json
+
+# ==========================================
+# 🛑 终极特洛伊木马：强行拦截 mootdx 测速黑洞
+# ==========================================
+# GitHub 云端每次都是全新机器，mootdx 找不到配置文件就会强制跨国 ping 测速。
+# 我们在导入 mootdx 之前，强行在系统里塞一个“伪造”的配置文件，骗过它的底层逻辑！
+mootdx_dir = os.path.expanduser('~/.mootdx')
+os.makedirs(mootdx_dir, exist_ok=True)
+config_file = os.path.join(mootdx_dir, 'config.json')
+
+# 如果没有配置文件，直接强行写入一个伪造的静态配置
+if not os.path.exists(config_file):
+    with open(config_file, 'w') as f:
+        fake_config = {
+            "BESTIP": {
+                "DEF": {"ip": "119.147.212.81", "port": 7709},
+                "STD": {"ip": "119.147.212.81", "port": 7709}
+            }
+        }
+        json.dump(fake_config, f)
+
+# ⚠️ 注意：必须在伪造配置文件之后，才能导入 mootdx！
+from mootdx.quotes import Quotes
+import pandas as pd
+import time
 import numpy as np
 import socket
 
 # ==========================================
-# 🎯 核心配置 (自动识别路径，修复系统只读权限报错)
+# 🎯 核心配置 (自动识别路径)
 # ==========================================
-# 获取当前脚本所在的文件夹绝对路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# 映射表路径：确保该文件与脚本在同一目录下
 MAP_FILE_PATH = os.path.join(BASE_DIR, 'stock_to_sector.csv')
-
-# 数据保存路径：固定在当前文件夹内
 SAVE_PATH = os.path.join(BASE_DIR, 'v4_rrg_data.csv')
 SURGE_SAVE_PATH = os.path.join(BASE_DIR, 'v4_volume_surge.csv')
 PULLBACK_SAVE_PATH = os.path.join(BASE_DIR, 'v4_pullback_candidates.csv')
 
-# 调试名单
-DEBUG_STOCKS = ['603878', '601727', '002640', '603418', '002009', '002971', '600111']
-
 
 def clean_stock_code(code_series):
-    """提取纯数字代码并转为 6 位字符串"""
     return code_series.astype(str).str.extract(r'(\d{6})')[0]
 
 
 def run_v4_engine():
-    print("🚀 启动 CMLM V4.4 终极双模引擎 (本地/云端全适配版)...")
+    print("🚀 启动 CMLM V4.4 终极双模引擎 (云端防卡死特装版)...")
 
     # ------------------------------------------
     # [1/5] 加载本地映射表
     # ------------------------------------------
     print(f"⏳ [1/5] 正在加载映射表: {MAP_FILE_PATH}")
     if not os.path.exists(MAP_FILE_PATH):
-        print(f"❌ 致命错误：在此路径下找不到 stock_to_sector.csv: {MAP_FILE_PATH}")
+        print("❌ 致命错误：找不到 stock_to_sector.csv！")
         return
 
     try:
@@ -50,8 +64,6 @@ def run_v4_engine():
                     break
             except:
                 pass
-
-        if df_map is None: raise ValueError("无法解析映射表文件。")
 
         code_col = [c for c in df_map.columns if '代码' in c][0]
         name_col = [c for c in df_map.columns if '名称' in c][0]
@@ -67,33 +79,32 @@ def run_v4_engine():
         return
 
     # ------------------------------------------
-    # [2/5] 智能连接通达信 (强制轮询静态IP，彻底禁用测速黑洞)
+    # [2/5] 强硬连接通达信 (测速机制已被彻底瘫痪)
     # ------------------------------------------
-    print("\n⏳ [2/5] 正在连接行情节点 (强制静态路由)...")
-    socket.setdefaulttimeout(5.0)  # 设置全局网络超时为 5 秒
+    print("\n⏳ [2/5] 正在连接行情节点 (静态路由硬穿透)...")
+    socket.setdefaulttimeout(5.0)
 
     client = None
     tdx_servers = [
         ('119.147.212.81', 7709), ('114.80.63.12', 7709),
-        ('121.14.110.200', 7709), ('110.139.17.151', 7709),
-        ('101.226.9.17', 7709), ('120.25.132.147', 7709)
+        ('121.14.110.200', 7709), ('110.139.17.151', 7709)
     ]
 
     for server in tdx_servers:
         try:
-            print(f"   --> 尝试连接节点: {server[0]}")
+            print(f"   --> 尝试握手: {server[0]}")
             client = Quotes.factory(market='std', server=server)
             if client:
                 print(f"   ✅ 成功硬连接节点: {server[0]}")
                 break
         except:
-            print(f"   ❌ 节点 {server[0]} 拒绝连接，切换下一个...")
+            print(f"   ❌ 节点 {server[0]} 拒绝连接，切换...")
             continue
 
-    socket.setdefaulttimeout(None)  # 恢复默认超时，防止后续拉取大数据中断
+    socket.setdefaulttimeout(None)
 
     if not client:
-        print("❌ 致命错误：网络彻底阻断，所有备用节点均失效。")
+        print("❌ 致命错误：网络彻底阻断。")
         return
 
     symbol_list = df_map['代码'].tolist()
@@ -125,7 +136,6 @@ def run_v4_engine():
     df_merged = df_merged[df_merged['last_close'] > 0].copy()
     df_merged['涨跌幅'] = (df_merged['price'] - df_merged['last_close']) / df_merged['last_close'] * 100
 
-    # 基础板块运算
     sector_df = df_merged.groupby('板块').agg({'涨跌幅': 'mean', 'amount': 'sum'}).reset_index()
     m_change, m_amount = sector_df['涨跌幅'].median(), sector_df['amount'].median()
     sector_df['相对强弱(X)'] = sector_df['涨跌幅'] - m_change
@@ -144,11 +154,9 @@ def run_v4_engine():
         code, amt, change, name = row['代码'], row['amount'], row['涨跌幅'], row['名称']
         try:
             df_k = client.bars(symbol=code, frequency=9, offset=30)
-            if df_k is None or df_k.empty:
-                df_k = client.bars(symbol=('sh' + code if code.startswith(('6', '9')) else 'sz' + code), frequency=9,
-                                   offset=30)
+            if df_k is None or df_k.empty: df_k = client.bars(
+                symbol=('sh' + code if code.startswith(('6', '9')) else 'sz' + code), frequency=9, offset=30)
             if isinstance(df_k, pd.DataFrame) and not df_k.empty:
-                if df_k.index.name == 'datetime': df_k.index.name = None
                 df_k = df_k.sort_values('datetime').reset_index(
                     drop=True) if 'datetime' in df_k.columns else df_k.sort_index().reset_index(drop=True)
                 if len(df_k) >= 20:
@@ -164,11 +172,10 @@ def run_v4_engine():
                         if cond_a or cond_b or cond_c:
                             reason = "回调二波起涨" if (cond_c and not cond_a) else (
                                 "趋势放量异动" if cond_b else "强势放量突破")
-                            surge_results.append({
-                                '代码': code, '名称': name, '板块': row['板块'], '涨跌幅(%)': round(change, 2),
-                                '增量倍数': round(ratio, 2), '今日成交额(亿)': round(amt / 1e8, 2),
-                                '常态均额(亿)': round(base / 1e8, 2), '入选逻辑': reason
-                            })
+                            surge_results.append(
+                                {'代码': code, '名称': name, '板块': row['板块'], '涨跌幅(%)': round(change, 2),
+                                 '增量倍数': round(ratio, 2), '今日成交额(亿)': round(amt / 1e8, 2),
+                                 '常态均额(亿)': round(base / 1e8, 2), '入选逻辑': reason})
         except:
             pass
 
@@ -192,11 +199,9 @@ def run_v4_engine():
         code, amt, change, name = row['代码'], row['amount'], row['涨跌幅'], row['名称']
         try:
             df_k = client.bars(symbol=code, frequency=9, offset=30)
-            if df_k is None or df_k.empty:
-                df_k = client.bars(symbol=('sh' + code if code.startswith(('6', '9')) else 'sz' + code), frequency=9,
-                                   offset=30)
+            if df_k is None or df_k.empty: df_k = client.bars(
+                symbol=('sh' + code if code.startswith(('6', '9')) else 'sz' + code), frequency=9, offset=30)
             if isinstance(df_k, pd.DataFrame) and not df_k.empty:
-                if df_k.index.name == 'datetime': df_k.index.name = None
                 df_k = df_k.sort_values('datetime').reset_index(
                     drop=True) if 'datetime' in df_k.columns else df_k.sort_index().reset_index(drop=True)
                 if len(df_k) >= 20:
@@ -204,7 +209,6 @@ def run_v4_engine():
                     recent_window = df_k.iloc[-7:-2]
                     breakout_idx, breakout_ratio = None, 0
 
-                    # 寻找前 2-6 天的放量大阳线
                     for i in range(len(recent_window)):
                         ri = recent_window.index[i]
                         if df_k['pct'].iloc[ri] >= 5.0:
@@ -217,17 +221,15 @@ def run_v4_engine():
                                     break
 
                     if breakout_idx is not None:
-                        # 洗盘三要素：缩量极致、价格回踩、不破底线
                         if amt < df_k['amount'].iloc[-2] and amt < df_k['amount'].iloc[breakout_idx] * 0.65:
                             if df_k['close'].iloc[-1] < df_k['close'].iloc[-2] and df_k['close'].iloc[-1] > \
                                     df_k['open'].iloc[breakout_idx]:
-                                pb_results.append({
-                                    '代码': code, '名称': name, '板块': row['板块'], '今日涨幅(%)': round(change, 2),
-                                    '回踩天数': f"{len(df_k) - 1 - breakout_idx} 天",
-                                    '今日量/爆发量': f"{round((amt / df_k['amount'].iloc[breakout_idx]) * 100, 1)}%",
-                                    '爆发日强度': f"放量 {round(breakout_ratio, 1)}倍",
-                                    '今日成交额(亿)': round(amt / 1e8, 2)
-                                })
+                                pb_results.append(
+                                    {'代码': code, '名称': name, '板块': row['板块'], '今日涨幅(%)': round(change, 2),
+                                     '回踩天数': f"{len(df_k) - 1 - breakout_idx} 天",
+                                     '今日量/爆发量': f"{round((amt / df_k['amount'].iloc[breakout_idx]) * 100, 1)}%",
+                                     '爆发日强度': f"放量 {round(breakout_ratio, 1)}倍",
+                                     '今日成交额(亿)': round(amt / 1e8, 2)})
         except:
             pass
 
