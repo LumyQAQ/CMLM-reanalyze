@@ -1,4 +1,5 @@
 .venv/
-__pycache__/
-*.csv
 .DS_Store
+__pycache__/
+*.pyc
+# 注意：不要忽略数据文件，因为我们需要云端读取它们
