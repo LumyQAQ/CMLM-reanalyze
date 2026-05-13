@@ -27,7 +27,7 @@ jobs:
 
     - name: ⚙️ 运行 V4 量化引擎 (生成最新数据)
       run: |
-        python v4_engine.py
+        python -u v4_engine.py
 
     - name: 💾 自动提交并推送到仓库
       run: |
