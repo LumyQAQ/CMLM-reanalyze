@@ -8,8 +8,6 @@ import pandas as pd
 # ==========================================
 # 🛑 终极特洛伊木马：强行拦截 mootdx 测速黑洞
 # ==========================================
-# GitHub 云端每次都是全新机器，mootdx 找不到配置文件就会强制跨国 ping 测速。
-# 我们在导入 mootdx 之前，强行在系统里塞一个“伪造”的配置文件，骗过它的底层逻辑！
 mootdx_dir = os.path.expanduser('~/.mootdx')
 os.makedirs(mootdx_dir, exist_ok=True)
 config_file = os.path.join(mootdx_dir, 'config.json')
@@ -24,7 +22,6 @@ if not os.path.exists(config_file):
         }
         json.dump(fake_config, f)
 
-# ⚠️ 注意：必须在伪造配置文件之后，才能导入 mootdx！
 from mootdx.quotes import Quotes
 
 # ==========================================
@@ -78,58 +75,71 @@ def run_v4_engine():
         return
 
     # ------------------------------------------
-    # [2/5] 强硬连接通达信 (测速机制已被彻底瘫痪)
+    # [2/5] 强硬连接通达信 (增加验钞机机制防假连通)
     # ------------------------------------------
-    print("\n⏳ [2/5] 正在连接行情节点 (静态路由硬穿透)...")
+    print("\n⏳ [2/5] 正在连接行情节点 (验证数据联通性)...")
     socket.setdefaulttimeout(5.0)
 
     client = None
+    # 扩充备用节点池，增加存活率
     tdx_servers = [
         ('119.147.212.81', 7709), ('114.80.63.12', 7709),
-        ('121.14.110.200', 7709), ('110.139.17.151', 7709)
+        ('121.14.110.200', 7709), ('110.139.17.151', 7709),
+        ('101.226.9.17', 7709), ('120.25.132.147', 7709),
+        ('111.62.118.66', 7709), ('112.186.223.119', 7709)
     ]
 
     for server in tdx_servers:
         try:
             print(f"   --> 尝试握手: {server[0]}")
-            client = Quotes.factory(market='std', server=server)
-            if client:
-                print(f"   ✅ 成功硬连接节点: {server[0]}")
-                break
+            temp_client = Quotes.factory(market='std', server=server)
+            if temp_client:
+                # 🛑 关键：验钞机！随便拉取一只股票，测试是不是僵尸节点
+                test_data = temp_client.quotes(symbol=['600000'])
+                if isinstance(test_data, pd.DataFrame) and not test_data.empty and 'code' in test_data.columns:
+                    print(f"   ✅ 成功连接且数据校验通过: {server[0]}")
+                    client = temp_client
+                    break
+                else:
+                    print(f"   ⚠️ 节点 {server[0]} 假连通 (被墙)，换下一个...")
+                    temp_client.client.close()
         except:
             print(f"   ❌ 节点 {server[0]} 拒绝连接，切换...")
             continue
 
-    # 🛡️ 绝不设置回 None！给后续所有请求套上 10 秒超时护盾，断了就跳过，绝不死等！
     socket.setdefaulttimeout(10.0)
 
     if not client:
-        print("❌ 致命错误：网络彻底阻断。")
+        print("❌ 致命错误：所有节点均被拦截，网络彻底阻断。")
         return
 
     symbol_list = df_map['代码'].tolist()
     all_quotes = []
     total_symbols = len(symbol_list)
-    print(f"   📡 正在抓取全市场 {total_symbols} 只个股实时快照 (附带防断流护盾)...")
+    print(f"   📡 正在抓取全市场 {total_symbols} 只个股实时快照...")
 
     for i in range(0, total_symbols, 80):
         chunk = symbol_list[i:i + 80]
         try:
             res = client.quotes(symbol=chunk)
-            if isinstance(res, pd.DataFrame):
+            # 🛑 关键：空壳过滤器！只有包含 code 列的真数据才被收录
+            if isinstance(res, pd.DataFrame) and not res.empty and 'code' in res.columns:
                 all_quotes.append(res)
+            elif isinstance(res, list) and len(res) > 0:
+                temp_df = pd.DataFrame(res)
+                if 'code' in temp_df.columns:
+                    all_quotes.append(temp_df)
 
-            # 心跳播报：每抓 800 只股票打印一次进度
             if (i + 80) % 800 == 0 or (i + 80) >= total_symbols:
-                print(f"   ...已成功抓取 {min(i + 80, total_symbols)} / {total_symbols} 只...")
+                print(f"   ...已校验抓取 {min(i + 80, total_symbols)} / {total_symbols} 只...")
 
             time.sleep(0.05)
         except Exception as e:
-            print(f"   ⚠️ 第 {i} 批次抓取超时或断流，已护盾拦截并跳过: {e}")
+            print(f"   ⚠️ 第 {i} 批次断流: {e}")
             pass
 
     if not all_quotes:
-        print("❌ 行情拉取失败。");
+        print("❌ 致命错误：全市场抓取结果为空，可能 IP 被临时封禁。");
         client.client.close();
         return
 
