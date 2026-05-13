@@ -1,5 +1,9 @@
 import os
 import json
+import socket
+import time
+import numpy as np
+import pandas as pd
 
 # ==========================================
 # 🛑 终极特洛伊木马：强行拦截 mootdx 测速黑洞
@@ -10,7 +14,6 @@ mootdx_dir = os.path.expanduser('~/.mootdx')
 os.makedirs(mootdx_dir, exist_ok=True)
 config_file = os.path.join(mootdx_dir, 'config.json')
 
-# 如果没有配置文件，直接强行写入一个伪造的静态配置
 if not os.path.exists(config_file):
     with open(config_file, 'w') as f:
         fake_config = {
@@ -23,10 +26,6 @@ if not os.path.exists(config_file):
 
 # ⚠️ 注意：必须在伪造配置文件之后，才能导入 mootdx！
 from mootdx.quotes import Quotes
-import pandas as pd
-import time
-import numpy as np
-import socket
 
 # ==========================================
 # 🎯 核心配置 (自动识别路径)
@@ -101,7 +100,8 @@ def run_v4_engine():
             print(f"   ❌ 节点 {server[0]} 拒绝连接，切换...")
             continue
 
-    socket.setdefaulttimeout(None)
+    # 🛡️ 绝不设置回 None！给后续所有请求套上 10 秒超时护盾，断了就跳过，绝不死等！
+    socket.setdefaulttimeout(10.0)
 
     if not client:
         print("❌ 致命错误：网络彻底阻断。")
@@ -109,15 +109,23 @@ def run_v4_engine():
 
     symbol_list = df_map['代码'].tolist()
     all_quotes = []
-    print(f"   📡 正在抓取全市场 {len(symbol_list)} 只个股实时快照...")
+    total_symbols = len(symbol_list)
+    print(f"   📡 正在抓取全市场 {total_symbols} 只个股实时快照 (附带防断流护盾)...")
 
-    for i in range(0, len(symbol_list), 80):
+    for i in range(0, total_symbols, 80):
         chunk = symbol_list[i:i + 80]
         try:
             res = client.quotes(symbol=chunk)
-            if isinstance(res, pd.DataFrame): all_quotes.append(res)
-            time.sleep(0.01)
-        except:
+            if isinstance(res, pd.DataFrame):
+                all_quotes.append(res)
+
+            # 心跳播报：每抓 800 只股票打印一次进度
+            if (i + 80) % 800 == 0 or (i + 80) >= total_symbols:
+                print(f"   ...已成功抓取 {min(i + 80, total_symbols)} / {total_symbols} 只...")
+
+            time.sleep(0.05)
+        except Exception as e:
+            print(f"   ⚠️ 第 {i} 批次抓取超时或断流，已护盾拦截并跳过: {e}")
             pass
 
     if not all_quotes:
@@ -127,6 +135,7 @@ def run_v4_engine():
 
     df_quotes = pd.concat(all_quotes, ignore_index=True)
     df_quotes['代码'] = clean_stock_code(df_quotes['code'])
+    print(f"   ✅ 快照拉取完毕，有效数据 {len(df_quotes)} 条！")
 
     # ------------------------------------------
     # [3/5] 合成 RRG 四象限数据
