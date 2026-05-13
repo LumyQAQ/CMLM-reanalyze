@@ -1,31 +1,12 @@
 import os
-import json
 import socket
 import time
 import numpy as np
 import pandas as pd
-
-# ==========================================
-# 🛑 终极特洛伊木马：强行拦截 mootdx 测速黑洞
-# ==========================================
-mootdx_dir = os.path.expanduser('~/.mootdx')
-os.makedirs(mootdx_dir, exist_ok=True)
-config_file = os.path.join(mootdx_dir, 'config.json')
-
-if not os.path.exists(config_file):
-    with open(config_file, 'w') as f:
-        fake_config = {
-            "BESTIP": {
-                "DEF": {"ip": "119.147.212.81", "port": 7709},
-                "STD": {"ip": "119.147.212.81", "port": 7709}
-            }
-        }
-        json.dump(fake_config, f)
-
 from mootdx.quotes import Quotes
 
 # ==========================================
-# 🎯 核心配置 (自动识别路径)
+# 🎯 核心配置 (自动识别绝对路径)
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAP_FILE_PATH = os.path.join(BASE_DIR, 'stock_to_sector.csv')
@@ -39,7 +20,7 @@ def clean_stock_code(code_series):
 
 
 def run_v4_engine():
-    print("🚀 启动 CMLM V4.4 终极双模引擎 (云端防卡死特装版)...")
+    print("🚀 启动 CMLM V4.4 终极双模引擎 (本地极速版)...")
 
     # ------------------------------------------
     # [1/5] 加载本地映射表
@@ -75,54 +56,35 @@ def run_v4_engine():
         return
 
     # ------------------------------------------
-    # [2/5] 强硬连接通达信 (增加验钞机机制防假连通)
+    # [2/5] 极速连接通达信 (回归 mootdx 智能测速)
     # ------------------------------------------
-    print("\n⏳ [2/5] 正在连接行情节点 (验证数据联通性)...")
-    socket.setdefaulttimeout(5.0)
+    print("\n⏳ [2/5] 正在呼叫 mootdx 寻找全网最快节点...")
 
-    client = None
-    # 扩充备用节点池，增加存活率
-    tdx_servers = [
-        ('119.147.212.81', 7709), ('114.80.63.12', 7709),
-        ('121.14.110.200', 7709), ('110.139.17.151', 7709),
-        ('101.226.9.17', 7709), ('120.25.132.147', 7709),
-        ('111.62.118.66', 7709), ('112.186.223.119', 7709)
-    ]
-
-    for server in tdx_servers:
-        try:
-            print(f"   --> 尝试握手: {server[0]}")
-            temp_client = Quotes.factory(market='std', server=server)
-            if temp_client:
-                # 🛑 关键：验钞机！随便拉取一只股票，测试是不是僵尸节点
-                test_data = temp_client.quotes(symbol=['600000'])
-                if isinstance(test_data, pd.DataFrame) and not test_data.empty and 'code' in test_data.columns:
-                    print(f"   ✅ 成功连接且数据校验通过: {server[0]}")
-                    client = temp_client
-                    break
-                else:
-                    print(f"   ⚠️ 节点 {server[0]} 假连通 (被墙)，换下一个...")
-                    temp_client.client.close()
-        except:
-            print(f"   ❌ 节点 {server[0]} 拒绝连接，切换...")
-            continue
-
+    # 给予合理的测速等待时间
     socket.setdefaulttimeout(10.0)
 
-    if not client:
-        print("❌ 致命错误：所有节点均被拦截，网络彻底阻断。")
+    try:
+        # 本地网络下，直接使用原生 factory，它会自动 ping 几十个节点并选出最优
+        client = Quotes.factory(market='std')
+        print("   ✅ 最佳节点连接成功！")
+    except Exception as e:
+        print(f"❌ 网络连接或测速失败: {e}")
+        print("💡 提示：如果开启了全局代理，请切换为【规则模式】。")
         return
+
+    # 连接成功后，给后续拉取数据套上 15 秒超时护盾，防止偶发断流
+    socket.setdefaulttimeout(15.0)
 
     symbol_list = df_map['代码'].tolist()
     all_quotes = []
     total_symbols = len(symbol_list)
-    print(f"   📡 正在抓取全市场 {total_symbols} 只个股实时快照...")
+    print(f"   📡 正在全速抓取全市场 {total_symbols} 只个股实时快照...")
 
     for i in range(0, total_symbols, 80):
         chunk = symbol_list[i:i + 80]
         try:
             res = client.quotes(symbol=chunk)
-            # 🛑 关键：空壳过滤器！只有包含 code 列的真数据才被收录
+            # 空壳过滤器：确保拿回来的真有 code 列
             if isinstance(res, pd.DataFrame) and not res.empty and 'code' in res.columns:
                 all_quotes.append(res)
             elif isinstance(res, list) and len(res) > 0:
@@ -130,16 +92,17 @@ def run_v4_engine():
                 if 'code' in temp_df.columns:
                     all_quotes.append(temp_df)
 
+            # 心跳播报
             if (i + 80) % 800 == 0 or (i + 80) >= total_symbols:
-                print(f"   ...已校验抓取 {min(i + 80, total_symbols)} / {total_symbols} 只...")
+                print(f"   ...已成功抓取 {min(i + 80, total_symbols)} / {total_symbols} 只...")
 
-            time.sleep(0.05)
+            time.sleep(0.01)  # 本地网络强悍，睡眠时间可以缩短
         except Exception as e:
-            print(f"   ⚠️ 第 {i} 批次断流: {e}")
+            print(f"   ⚠️ 第 {i} 批次网络颠簸: {e}")
             pass
 
     if not all_quotes:
-        print("❌ 致命错误：全市场抓取结果为空，可能 IP 被临时封禁。");
+        print("❌ 致命错误：全市场抓取结果为空。");
         client.client.close();
         return
 
@@ -209,7 +172,7 @@ def run_v4_engine():
     # ------------------------------------------
     # [5/5] 🐉 龙回头：左侧缩量洗盘漏斗
     # ------------------------------------------
-    print("\n⏳ [5/5] 执行【龙回头】缩量洗盘扫描 (耗时约 1-2 分钟)...")
+    print("\n⏳ [5/5] 执行【龙回头】缩量洗盘扫描 (耗时约 1 分钟)...")
     df_pb_seed = df_merged[
         (df_merged['涨跌幅'] <= 1.5) & (df_merged['涨跌幅'] >= -7.0) & (df_merged['amount'] >= 30000000)].copy()
     pb_results = []
@@ -258,7 +221,7 @@ def run_v4_engine():
     df_pullback_final.to_csv(PULLBACK_SAVE_PATH, index=False)
 
     client.client.close()
-    print(f"\n🎉 V4.4 全套扫描完毕！数据已存入: {BASE_DIR}")
+    print(f"\n🎉 引擎扫描完毕！数据已更新至本地！")
 
 
 if __name__ == "__main__":
