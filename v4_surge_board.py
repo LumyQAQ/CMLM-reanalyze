@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # ==========================================
 # 🎯 智能路径配置
@@ -14,17 +14,21 @@ st.set_page_config(page_title="量价关系双模复盘", layout="wide", page_ic
 
 
 # ==========================================
-# 🎨 页面排版与极速数据加载模块 (强固防空壳版)
+# 🎨 页面排版与极速数据加载模块 (已修复时区显示)
 # ==========================================
 @st.cache_data(ttl=60)
 def load_data(path):
     if not os.path.exists(path):
         return pd.DataFrame(), "等待数据同步..."
     try:
+        # 获取文件的最后修改时间戳
         mtime = os.path.getmtime(path)
-        trade_date = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
 
-        # 🛡️ 防御机制：如果是 0 字节的空文件，直接返回空表，绝不报错
+        # 🕒 时区修复核心逻辑：将服务器时间强制转为 UTC，再加 8 小时转换为东八区时间
+        utc_time = datetime.fromtimestamp(mtime, tz=timezone.utc)
+        local_time = utc_time + timedelta(hours=8)
+        trade_date = local_time.strftime('%Y-%m-%d %H:%M')
+
         if os.path.getsize(path) == 0:
             return pd.DataFrame(), trade_date
 
@@ -33,7 +37,7 @@ def load_data(path):
             df['代码'] = df['代码'].astype(str).str.zfill(6)
         return df, trade_date
     except pd.errors.EmptyDataError:
-        return pd.DataFrame(), trade_date  # 捕获 pandas 空数据报错
+        return pd.DataFrame(), trade_date
     except Exception as e:
         return pd.DataFrame(), "解析异常"
 
