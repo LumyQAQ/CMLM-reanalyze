@@ -23,7 +23,7 @@ def clean_stock_code(code_series):
 
 
 def run_v4_engine():
-    print("🚀 启动 CMLM V4.4 终极引擎 (新增【龙回头】缩量回踩算法)...")
+    print("🚀 启动 CMLM V4.4 终极引擎 (全市场 10CM/20CM 满血扫描版)...")
 
     # ------------------------------------------
     # [1/5] 加载映射表
@@ -50,10 +50,12 @@ def run_v4_engine():
         df_map = df_map[[code_col, name_col, industry_col]].copy()
         df_map.columns = ['代码', '名称', '板块']
         df_map['代码'] = clean_stock_code(df_map['代码'])
-        df_map = df_map[df_map['代码'].str.match(r'^(60|688|00|300)\d{4}$')]
+
+        # 🛠️ 核心修复：完美涵盖 60(沪市), 00(深市), 30(创业板), 68(科创板)
+        df_map = df_map[df_map['代码'].str.match(r'^(60|00|30|68)\d{4}$')]
         df_map.dropna(subset=['代码', '板块'], inplace=True)
     except Exception as e:
-        print(f"❌ 读取 CSV 失败: {e}");
+        print(f"❌ 读取 CSV 失败: {e}")
         return
 
     # ------------------------------------------
@@ -77,8 +79,8 @@ def run_v4_engine():
             pass
 
     if not all_quotes_dfs:
-        print("❌ mootdx 拉取彻底失败。");
-        client.client.close();
+        print("❌ mootdx 拉取彻底失败。")
+        client.client.close()
         return
 
     df_quotes = pd.concat(all_quotes_dfs, ignore_index=True)
