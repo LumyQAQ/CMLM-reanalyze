@@ -210,7 +210,7 @@ def run_v4_engine():
 
                 df_k['pct_change'] = df_k['close'].pct_change() * 100
 
-                recent_window = df_k.iloc[-7:-2]
+                recent_window = df_k.iloc[-7:-1]
                 breakout_idx = None
                 breakout_ratio = 0
                 for i in range(len(recent_window)):
