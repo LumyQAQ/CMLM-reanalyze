@@ -1,63 +1,115 @@
-# ⚔️ CMLM 量价三模复盘系统 (V4.6 终极版)
+# CMLM 量价三模复盘系统 V4.6
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
-![Streamlit](https://img.shields.io/badge/Streamlit-Cloud-FF4B4B.svg)
-![mootdx](https://img.shields.io/badge/mootdx-行情数据驱动-green.svg)
-![Version](https://img.shields.io/badge/版本-V4.6_终极满血版-success.svg)
+CMLM（城门立木）是一套 A 股量价扫描与 Streamlit 看板系统。它把本地行情扫描、GitHub 数据同步和云端看板拆开：本地负责拉取 mootdx 行情并生成 CSV，云端只读取已生成的数据文件。
 
-> **“弱水三千，只取一瓢饮。”** —— 本系统摒弃繁杂的传统技术指标，直击游资操盘最核心的要素：**【量价异动】**与**【资金记忆】**。
+本项目只做复盘、观察条件和投研辅助，不构成任何买卖建议、收益承诺或投资顾问服务。
 
-CMLM (城门立木) 是一套全自动化的 A 股量价扫描与可视化看板系统。通过对全市场 (全面覆盖主板 10CM，及创业板/科创板 20CM) 5000+ 标的进行极速穿透，精准捕捉主升浪启动节点与极致缩量洗盘节点。
+## 核心模块
 
----
+- `v4_engine.py`：本地扫描引擎，生成三类结果池。
+- `v4_surge_board.py`：三模量价复盘主看板。
+- `v4_dashboard.py`：RRG 四象限板块雷达看板。
+- `scripts/cmlm_auto_job.py`：定时运行、生成 Markdown/JSON 复盘、发布到 GitHub、可选推送通知。
+- `tests/`：不连接真实行情源的单元测试。
 
-## 💡 核心交易逻辑：三频段独立雷达
+## 三类结果池
 
-经过 V4.6 版本的重构，系统现已升级为**三大独立核心漏斗**，分别对应交易中最暴利的三种操盘模式：
+| 文件 | 含义 |
+|---|---|
+| `v4_surge_trend.csv` | 右侧趋势：成交额放量、趋势接力、二波起涨 |
+| `v4_surge_range.csv` | 右侧结构：横盘后放量突破区间前高 |
+| `v4_pullback_candidates.csv` | 左侧低吸：突破后缩量回踩且未破关键防线 |
 
-### 🚀 频段一：右侧趋势 (成交额放量) —— 抓主升接力
-* **适用场景：** 寻找当日资金合力做多、量价齐升的异动标的。
-* **算法引擎：** 严格筛选今日涨幅 $\ge$ 2.5%，且成交量较过去 15 日平均常态均量放大 **1.1倍 至 1.35 倍**以上的个股。
-* **逻辑标签：** 内置分类算法，智能打标为 `强势放量突破`、`趋势放量异动`、`回调二波起涨`。
+三类 CSV 均包含 `3日涨幅(%)`、`5日涨幅(%)`，保证看板、自动报告和数据产物口径一致。
 
-### 🏆 频段二：右侧结构 (区间放量破位) —— 抓箱体突破 (🌟 V4.6 王牌)
-* **适用场景：** 寻找经典“杯柄形态”或“箱体突破”的高胜率大波段标的。
-* **算法引擎：** 系统具备 K 线结构记忆能力，寻找横盘洗盘超 **4 天**，且今日以放量大阳线（涨幅 $\ge$ 4%，增量 $\ge$ 1.5倍）**强力突破过去 40 天最高收盘价**的标的。
-* **智能标注：** 看板会自动计算并显示“突破 X 天前高”。
+## 安装
 
-### 🐉 频段三：左侧低吸 (突破后缩量回踩) —— 抓极致洗盘
-* **适用场景：** 偏好低吸伏击，寻找前期爆发过，目前正在分歧洗盘的潜伏标的。
-* **算法引擎：** 1. 寻找近 2~6 天内出现过涨幅 >5% 且放量 >1.5倍 的“爆发阳线”。
-  2. 寻找近两日出现 **极致缩量** (今日量 < 昨天量，且小于爆发日 65%)。
-  3. 寻找未破防线 (今日收盘下跌洗盘，但绝不跌破爆发日开盘价)。
-
----
-
-## 🏗️ 架构亮点：前后端极速解耦 & 盘中雷达
-
-本系统采用了最先进的**【前后端物理隔离】**架构，彻底告别海外云服务器拉取国内行情的断流问题：
-
-1. **💻 数据引擎层 (本地化 `v4_engine.py`)：**
-   * 部署在本地机器，调用 `mootdx` 智能测速，**1 分钟内完成全市场 5000+ 标的扫板**。
-   * **【独家】盘中动态量能外推算法：** 引擎内置系统时间感知。若在 14:30 盘中运行，系统会自动按 `240/已开盘分钟数` 动态放大当前成交额。完美支持**尾盘抢先狙击**，不再局限于盘后复盘！
-2. **☁️ 展示看板层 (云端 `v4_surge_board.py`)：**
-   * 托管于 Streamlit Cloud，纯前端展示，**零延迟秒开**。
-   * 搭载超强容错机制，自动修正 UTC 时区偏移，并完美处理极端行情下的空数据展示。
-3. **🌉 数据桥梁 (GitHub)：**
-   * 引擎生成 3 个独立 CSV 文件后，通过 Git 直推云端，驱动网页瞬间刷新。
-
----
-
-## 🛠️ 安装与部署指南
-
-### 1. 本地环境配置
 ```bash
-# 克隆仓库
-git clone [https://github.com/YourUsername/CMLM-reanalyze.git](https://github.com/YourUsername/CMLM-reanalyze.git)
+git clone https://github.com/LumyQAQ/CMLM-reanalyze.git
 cd CMLM-reanalyze
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-# 安装依赖 (确保包含 mootdx 与 pandas)
-pip install pandas numpy mootdx streamlit
+根目录需要存在 `stock_to_sector.csv`，字段至少包含“代码、名称、行业”。当前仓库内置文件为 UTF-16 编码，引擎会按 `utf-16 / gbk / utf-8-sig / utf-8` 顺序尝试读取。
 
-# 准备底层映射表
-# 请确保根目录下存在 stock_to_sector.csv (需包含：代码, 名称, 板块)
+## 手动运行
+
+```bash
+python v4_engine.py
+streamlit run v4_surge_board.py
+```
+
+旧 RRG 看板可用：
+
+```bash
+streamlit run v4_dashboard.py
+```
+
+## 自动任务
+
+生成报告但不跑行情、不发布：
+
+```bash
+python scripts/cmlm_auto_job.py --slot 1505 --force --skip-engine --no-publish --no-notify
+```
+
+完整流程：
+
+```bash
+python scripts/cmlm_auto_job.py --auto-slot
+```
+
+常用 slot：
+
+| slot | 用途 |
+|---|---|
+| `1135` | 上午收盘复盘 |
+| `1430` | 尾盘观察池 |
+| `1505` | 收盘复盘 |
+
+首次配置通知时复制样例：
+
+```bash
+cp scripts/cmlm_auto.env.example scripts/cmlm_auto.env
+```
+
+支持 `pushplus`、`serverchan`、`wecom`。先设置 `CMLM_NOTIFY_DRY_RUN=1` 做本地预演，确认内容后再关闭 dry-run。
+
+## GitHub 发布
+
+自动任务默认把以下文件复制到干净的发布 clone，再提交到 `origin/main`：
+
+- `v4_pullback_candidates.csv`
+- `v4_surge_range.csv`
+- `v4_surge_trend.csv`
+- `v4_cmlm_analysis_latest.md`
+- `v4_cmlm_analysis_latest.json`
+
+先 dry-run：
+
+```bash
+python scripts/cmlm_auto_job.py --slot 1505 --force --skip-engine --no-push --no-notify
+```
+
+发布前脚本会校验复制后的文件 SHA-256，避免把半写入或错误文件提交出去。
+
+## 测试
+
+```bash
+python -m py_compile v4_engine.py v4_dashboard.py v4_surge_board.py test_kline.py scripts/cmlm_auto_job.py
+python -m unittest discover -s tests
+```
+
+测试不会连接真实行情源。若后续要启用 GitHub Actions，可把上述两条命令放入 workflow；当前推送凭据需要带 `workflow` scope 才能创建 `.github/workflows/*` 文件。
+
+## 数据与提交约定
+
+- 代码改动和数据刷新尽量分开提交。
+- 数据刷新提交建议使用 `chore: update CMLM <slot> scan YYYY-MM-DD HH:MM`。
+- 不要把 `logs/`、`notify_dryrun/`、本地 `.env` 文件提交到仓库。
+
+## 风险边界
+
+行情源可能超时、缺字段或返回空数据。引擎会打印失败批次和 K 线失败样本；如果核心数据不可用，脚本会退出非零状态，而不是静默生成看似正常的结果。
