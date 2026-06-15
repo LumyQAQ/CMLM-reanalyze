@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 # ==========================================
 # 🎯 智能路径配置
@@ -19,8 +20,7 @@ def load_data(path):
     if not os.path.exists(path): return pd.DataFrame(), "等待数据同步..."
     try:
         mtime = os.path.getmtime(path)
-        utc_time = datetime.fromtimestamp(mtime, tz=timezone.utc)
-        local_time = utc_time + timedelta(hours=8)
+        local_time = datetime.fromtimestamp(mtime, tz=ZoneInfo("Asia/Shanghai"))
         trade_date = local_time.strftime('%Y-%m-%d %H:%M')
 
         if os.path.getsize(path) == 0: return pd.DataFrame(), trade_date
@@ -30,8 +30,8 @@ def load_data(path):
         return df, trade_date
     except pd.errors.EmptyDataError:
         return pd.DataFrame(), trade_date
-    except Exception:
-        return pd.DataFrame(), "解析异常"
+    except Exception as exc:
+        return pd.DataFrame(), f"解析异常：{exc}"
 
 
 def momentum_columns():
@@ -46,8 +46,8 @@ df_range, range_date = load_data(SURGE_RANGE_FILE)
 df_pullback, pb_date = load_data(PULLBACK_FILE)
 
 # 获取有效日期
-valid_dates = [d for d in [trend_date, range_date, pb_date] if d not in ["等待数据同步...", "解析异常"]]
-trade_date = valid_dates[0] if valid_dates else "等待数据同步..."
+valid_dates = [d for d in [trend_date, range_date, pb_date] if not d.startswith(("等待数据同步", "解析异常"))]
+trade_date = max(valid_dates) if valid_dates else "等待数据同步..."
 
 st.title("⚔️ 城门立木 · 量价关系全景复盘")
 st.subheader(f"📅 最新数据更新时间：{trade_date}")
@@ -107,7 +107,7 @@ with tab3:
         st.dataframe(df_pullback, use_container_width=True, hide_index=True, height=600,
                      column_config={
                          "代码": st.column_config.TextColumn("代码"), "名称": st.column_config.TextColumn("名称"),
-                         "今日涨幅(%)": st.column_config.NumberColumn("今日跌幅", format="%.2f %%"),
+                         "今日涨幅(%)": st.column_config.NumberColumn("今日涨跌幅", format="%.2f %%"),
                          **momentum_columns(),
                          "今日量/爆发量": st.column_config.TextColumn("📉 缩量程度 (含预估)"),
                          "爆发日强度": st.column_config.TextColumn("💥 前期特征"),

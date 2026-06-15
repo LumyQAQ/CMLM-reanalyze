@@ -2,4 +2,8 @@
 .DS_Store
 __pycache__/
 *.pyc
+logs/
+notify_dryrun/
+cmlm_auto.env
+scripts/cmlm_auto.env
 # 注意：不要忽略数据文件，因为我们需要云端读取它们
