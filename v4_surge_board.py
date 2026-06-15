@@ -34,6 +34,13 @@ def load_data(path):
         return pd.DataFrame(), "解析异常"
 
 
+def momentum_columns():
+    return {
+        "3日涨幅(%)": st.column_config.NumberColumn("3日涨幅", format="%.2f %%"),
+        "5日涨幅(%)": st.column_config.NumberColumn("5日涨幅", format="%.2f %%"),
+    }
+
+
 df_trend, trend_date = load_data(SURGE_TREND_FILE)
 df_range, range_date = load_data(SURGE_RANGE_FILE)
 df_pullback, pb_date = load_data(PULLBACK_FILE)
@@ -69,6 +76,7 @@ with tab1:
                          "代码": st.column_config.TextColumn("代码"), "名称": st.column_config.TextColumn("名称"),
                          "逻辑标签": st.column_config.TextColumn("🔥 形态意图"),
                          "涨跌幅(%)": st.column_config.NumberColumn("涨跌幅", format="%.2f %%"),
+                         **momentum_columns(),
                          "增量倍数": st.column_config.NumberColumn("📈 增量倍数", format="%.2f x"),
                          "今日成交额(亿)": st.column_config.NumberColumn("今日(含预估)成交额", format="%.2f"),
                          "常态均额(亿)": st.column_config.NumberColumn("常态均额", format="%.2f"),
@@ -85,6 +93,7 @@ with tab2:
                          "代码": st.column_config.TextColumn("代码"), "名称": st.column_config.TextColumn("名称"),
                          "突破类型": st.column_config.TextColumn("⚔️ 破位结构"),
                          "涨跌幅(%)": st.column_config.NumberColumn("涨跌幅", format="%.2f %%"),
+                         **momentum_columns(),
                          "增量倍数": st.column_config.NumberColumn("📈 增量倍数", format="%.2f x"),
                          "今日成交额(亿)": st.column_config.NumberColumn("今日(含预估)成交额", format="%.2f"),
                      })
@@ -99,6 +108,7 @@ with tab3:
                      column_config={
                          "代码": st.column_config.TextColumn("代码"), "名称": st.column_config.TextColumn("名称"),
                          "今日涨幅(%)": st.column_config.NumberColumn("今日跌幅", format="%.2f %%"),
+                         **momentum_columns(),
                          "今日量/爆发量": st.column_config.TextColumn("📉 缩量程度 (含预估)"),
                          "爆发日强度": st.column_config.TextColumn("💥 前期特征"),
                      })
