@@ -1,0 +1,13 @@
+{
+  "input_libraries": [
+    "/Users/ziranfeng/Desktop/nuwa-skill-main/outputs/kpl_concepts_20260702_1605_final",
+    "/Users/ziranfeng/Desktop/nuwa-skill-main/outputs/kpl_concepts_20260702_batch2_1728_final"
+  ],
+  "input_library_count": 2,
+  "source_concept_stock_rows": 10166,
+  "concept_count": 214,
+  "concept_stock_rows": 10166,
+  "unique_stock_count": 4392,
+  "method": "Merged cleaned OCR concept-stock maps by concept_name and deduped concept-stock pairs.",
+  "caveat": "Candidate library from KPL exported images. Verify disputed items against source image/raw OCR."
+}
