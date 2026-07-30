@@ -1,6 +1,7 @@
 pandas
 numpy
 plotly
-streamlit
+# Pin Streamlit to avoid frontend static module loading drift on Community Cloud.
+streamlit==1.47.1
 mootdx
 requests
